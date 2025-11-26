@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import messagebox
 import bcrypt 
-from database import connect_app_db 
+from database import get_db_connection  # Alterado para a conexão única
 from mysql.connector import Error
 
 class LoginFrame(tk.Frame):
@@ -28,36 +28,38 @@ class LoginFrame(tk.Frame):
         self.entry_senha.pack(fill="x", expand=True)
 
         self.var_mostrar_senha = tk.BooleanVar()
-        tk.Checkbutton(
-            frame_principal, text="Mostrar Senha", 
-            variable=self.var_mostrar_senha, 
-            onvalue=True, offvalue=False,
-            bg="#f5f5f5", 
-            command=lambda: self.entry_senha.config(show="" if self.var_mostrar_senha.get() else "*")
-        ).pack(anchor="w")
+        check_senha = tk.Checkbutton(frame_principal, text="Mostrar senha", variable=self.var_mostrar_senha, 
+                                     command=self.alternar_visualizacao_senha, bg="#f5f5f5")
+        check_senha.pack(anchor="w")
 
-        self.lbl_aviso = tk.Label(frame_principal, text="", fg="red", bg="#f5f5f5")
+        self.lbl_aviso = tk.Label(self, text="", fg="red", bg="#f5f5f5", font=("Arial", 10))
         self.lbl_aviso.pack(pady=5)
 
-        tk.Button(
-            frame_principal, text="Entrar", 
-            bg="#28A745", fg="white", font=("Arial", 11, "bold"),
-            command=self.realizar_login,
+        btn_entrar = tk.Button(
+            self, text="Entrar",
+            width=20, height=2,
+            bg="#28A745", fg="white",
+            font=("Arial", 11, "bold"),
+            command=self.fazer_login,
             cursor="hand2"
-        ).pack(pady=10, fill="x")
+        )
+        btn_entrar.pack(pady=20)
 
-        tk.Button(
-            frame_principal, text="Voltar", 
+        btn_voltar = tk.Button(
+            self, text="Voltar",
             bg="#6c757d", fg="white",
-            command=self.voltar,
+            command=lambda: controller.mostrar_frame(controller.frames["InterfacePrincipalFrame"]),
             cursor="hand2"
-        ).pack(pady=5, fill="x")
+        )
+        btn_voltar.pack(pady=5)
 
-    def voltar(self):
-        from interface_principal_frame import InterfacePrincipalFrame
-        self.controller.mostrar_frame(InterfacePrincipalFrame)
+    def alternar_visualizacao_senha(self):
+        if self.var_mostrar_senha.get():
+            self.entry_senha.config(show="")
+        else:
+            self.entry_senha.config(show="*")
 
-    def realizar_login(self):
+    def fazer_login(self):
         usuario = self.entry_usuario.get().strip()
         senha_digitada = self.entry_senha.get().strip()
 
@@ -65,7 +67,8 @@ class LoginFrame(tk.Frame):
             self.lbl_aviso.config(text="Preencha todos os campos!")
             return
 
-        conn = connect_app_db()
+        # Conexão unificada
+        conn = get_db_connection()
         if not conn:
             self.lbl_aviso.config(text="Erro de conexão com o banco.")
             return
@@ -73,8 +76,8 @@ class LoginFrame(tk.Frame):
         cursor = conn.cursor(dictionary=True) 
         
         try:
-            # Busca usuário pelo email ou CPF
-            sql = "SELECT id_usuario, ds_senha FROM tb_usuario WHERE (ds_email=%s OR nr_cpf=%s)"
+            # Busca na tabela do APP (tb_usuario)
+            sql = "SELECT id_usuario, ds_senha FROM tb_usuario_app WHERE (ds_email=%s OR nr_cpf=%s)"
             cursor.execute(sql, (usuario, usuario))
             resultado = cursor.fetchone()
 
@@ -85,6 +88,7 @@ class LoginFrame(tk.Frame):
                     id_usuario_logado = resultado["id_usuario"]
                     self.controller.id_usuario_logado = id_usuario_logado
                     
+                    # Limpa campos
                     self.entry_usuario.delete(0, 'end')
                     self.entry_senha.delete(0, 'end')
                     self.lbl_aviso.config(text="")

@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-from database import connect_app_db
+from database import get_db_connection # Alterado
 from mysql.connector import Error
 
 class TelaInicialFrame(tk.Frame):
@@ -10,6 +10,7 @@ class TelaInicialFrame(tk.Frame):
         self.configure(bg="#f5f5f5")
         
         fonte_titulo = ("Arial", 16, "bold")
+        fonte_info = ("Arial", 12)
         fonte_botao = ("Arial", 11)
 
         self.lbl_boas_vindas = tk.Label(
@@ -18,15 +19,27 @@ class TelaInicialFrame(tk.Frame):
             font=fonte_titulo, 
             bg="#f5f5f5"
         )
-        self.lbl_boas_vindas.pack(pady=30)
+        self.lbl_boas_vindas.pack(pady=(30, 10))
+
+        # Painel de Status do Cartão
+        self.lbl_info_cartao = tk.Label(
+            self,
+            text="Nenhum cartão vinculado.",
+            font=fonte_info,
+            bg="#e9ecef",
+            fg="#333",
+            padx=10, pady=10,
+            relief="groove"
+        )
+        self.lbl_info_cartao.pack(pady=10, fill="x", padx=40)
 
         frame_botoes = tk.Frame(self, bg="#f5f5f5")
         frame_botoes.pack(expand=True)
 
         btn_validar_cartao = tk.Button(
             frame_botoes, 
-            text="Validar Cartão", 
-            width=20, height=2,
+            text="Validar/Sincronizar Cartão", 
+            width=25, height=2,
             bg="#4CAF50", fg="white", 
             font=fonte_botao,
             command=self.ir_para_validar_cartao, 
@@ -37,7 +50,7 @@ class TelaInicialFrame(tk.Frame):
         btn_recarga_cartao = tk.Button(
             frame_botoes, 
             text="Recarregar Cartão", 
-            width=20, height=2,
+            width=25, height=2,
             bg="#FFC107", fg="black", 
             font=fonte_botao,
             command=self.recarga_cartao, 
@@ -62,33 +75,55 @@ class TelaInicialFrame(tk.Frame):
         messagebox.showinfo("Em Breve", "Função de recarga de cartão ainda não implementada.")
 
     def atualizar_dados_usuario(self):
-        """Busca o nome do usuário no banco e atualiza o label."""
+        """Busca o nome do usuário e dados do cartão no banco unificado."""
         id_usuario = self.controller.id_usuario_logado
         
         if not id_usuario:
             self.lbl_boas_vindas.config(text="Erro: Usuário não logado")
             return
 
-        conn = connect_app_db()
+        conn = get_db_connection() # Conexão única
         if not conn:
             self.lbl_boas_vindas.config(text="Erro de conexão")
             return
             
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
         try:
-            # Corrigido para nm_nome
-            sql = "SELECT nm_nome FROM tb_usuario WHERE id_usuario = %s"
-            cursor.execute(sql, (id_usuario,))
-            resultado = cursor.fetchone()
+            # 1. Buscar Nome (Tabela do App)
+            sql_user = "SELECT nm_nome FROM tb_usuario_app WHERE id_usuario = %s"
+            cursor.execute(sql_user, (id_usuario,))
+            user_data = cursor.fetchone()
             
-            if resultado:
-                nome_usuario = resultado[0]
-                self.lbl_boas_vindas.config(text=f"Bem-vindo, {nome_usuario}!")
+            if user_data:
+                self.lbl_boas_vindas.config(text=f"Bem-vindo, {user_data['nm_nome']}!")
             else:
                 self.lbl_boas_vindas.config(text="Usuário não encontrado.")
+
+            # 2. Buscar Cartão Vinculado (Tabela do App - dados locais/sincronizados)
+            sql_card = """
+                SELECT id_cartao_nmr_cartao, vlr_saldo, tipo_cartao 
+                FROM tb_cartao_app 
+                WHERE id_usuario = %s AND ds_status = 'desbloqueado'
+                LIMIT 1
+            """
+            cursor.execute(sql_card, (id_usuario,))
+            card_data = cursor.fetchone()
+
+            if card_data:
+                saldo_fmt = f"R$ {card_data['vlr_saldo']:.2f}".replace('.', ',')
+                # Exibe tipo do cartão se disponível (vimos que adicionamos esse campo no passo anterior)
+                tipo_str = f"\nTipo: {card_data.get('tipo_cartao', 'Comum')}"
+                
+                texto_cartao = (f"Cartão: {card_data['id_cartao_nmr_cartao']}"
+                                f"{tipo_str}\n"
+                                f"Saldo Atual: {saldo_fmt}")
+                self.lbl_info_cartao.config(text=texto_cartao, fg="black", bg="#d4edda")
+            else:
+                self.lbl_info_cartao.config(text="Nenhum cartão ativo vinculado.", fg="#555", bg="#e9ecef")
                 
         except Error as e:
             self.lbl_boas_vindas.config(text="Erro ao buscar dados.")
+            print(e)
         finally:
             if conn.is_connected():
                 cursor.close()
