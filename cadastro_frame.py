@@ -113,7 +113,7 @@ class CadastroFrame(tk.Frame):
         cursor = conn.cursor()
         try:
             # Verifica duplicidade
-            sql_check = "SELECT 1 FROM tb_usuario WHERE nr_cpf = %s OR ds_email = %s"
+            sql_check = "SELECT 1 FROM tb_usuario_app WHERE nr_cpf = %s OR ds_email = %s"
             cursor.execute(sql_check, (cpf, email))
             if cursor.fetchone():
                 self.exibir_aviso("CPF ou E-mail já cadastrado!", "erro")

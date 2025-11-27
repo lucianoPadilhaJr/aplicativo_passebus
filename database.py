@@ -29,5 +29,3 @@ def get_db_connection():
 def connect_app_db():
     return get_db_connection()
 
-def connect_sim_db():
-    return get_db_connection()
