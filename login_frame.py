@@ -3,6 +3,7 @@ from tkinter import messagebox
 import bcrypt 
 from database import get_db_connection  # Alterado para a conexão única
 from mysql.connector import Error
+from interface_principal_frame import InterfacePrincipalFrame 
 
 class LoginFrame(tk.Frame):
     def __init__(self, parent, controller):
@@ -48,9 +49,11 @@ class LoginFrame(tk.Frame):
         btn_voltar = tk.Button(
             self, text="Voltar",
             bg="#6c757d", fg="white",
-            command=lambda: controller.mostrar_frame(controller.frames["InterfacePrincipalFrame"]),
+            # Passamos a CLASSE diretamente. O controller sabe buscar a instância correta.
+            command=lambda: controller.mostrar_frame(InterfacePrincipalFrame),
             cursor="hand2"
         )
+        
         btn_voltar.pack(pady=5)
 
     def alternar_visualizacao_senha(self):
